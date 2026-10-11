@@ -1,4 +1,3 @@
-﻿
 """PatchProof: evaluate candidate implementations against contract tests."""
 
 import argparse
@@ -12,9 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from .registry import TASKS
+    from .registry import TASKS, list_tasks
 except ImportError:
-    from registry import TASKS
+    from registry import TASKS, list_tasks
+
 
 def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
     """Run a task's contract tests against a candidate Python file."""
@@ -94,7 +94,6 @@ def main() -> int:
     )
     parser.add_argument(
         "--candidate",
-        required=True,
         help="Path to a Python file implementing final_price.",
     )
     parser.add_argument(
@@ -104,11 +103,27 @@ def main() -> int:
         help="Contract task to evaluate (default: PP-001).",
     )
     parser.add_argument(
+        "--list-tasks",
+        action="store_true",
+        help="List registered tasks and exit.",
+    )
+    parser.add_argument(
         "--output",
         default="results/latest.json",
         help="Path for the JSON result report.",
     )
     args = parser.parse_args()
+
+    if args.list_tasks:
+        for task in list_tasks():
+            print(
+                f"{task['task_id']}\t{task['description']} "
+                f"({task['test_count']} tests)"
+            )
+        return 0
+
+    if not args.candidate:
+        parser.error("--candidate is required unless --list-tasks is used")
 
     try:
         result = evaluate(Path(args.candidate), args.task)

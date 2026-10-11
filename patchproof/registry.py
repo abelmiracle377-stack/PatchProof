@@ -1,4 +1,4 @@
-﻿"""Central registry of PatchProof benchmark tasks."""
+"""Central registry of PatchProof benchmark tasks."""
 
 TASKS = {
     "PP-001": {
@@ -76,3 +76,45 @@ def test_invalid_inputs(price, discount):
 ''',
     },
 }
+
+
+def validate_registry(tasks: dict | None = None) -> None:
+    """Validate task metadata before it is used by the runner."""
+    entries = TASKS if tasks is None else tasks
+    if not isinstance(entries, dict) or not entries:
+        raise ValueError("Task registry must be a non-empty dictionary.")
+
+    for task_id, task in entries.items():
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("Every task must have a non-empty string ID.")
+        if not isinstance(task, dict):
+            raise ValueError(f"Task {task_id!r} must be a dictionary.")
+
+        description = task.get("description")
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError(f"Task {task_id!r} requires a non-empty description.")
+
+        test_count = task.get("test_count")
+        if isinstance(test_count, bool) or not isinstance(test_count, int) or test_count < 1:
+            raise ValueError(f"Task {task_id!r} requires a positive integer test_count.")
+
+        test_source = task.get("test_source")
+        if not isinstance(test_source, str) or not test_source.strip():
+            raise ValueError(f"Task {task_id!r} requires non-empty test_source.")
+
+
+def list_tasks(tasks: dict | None = None) -> list[dict]:
+    """Return validated task metadata in stable task-ID order."""
+    entries = TASKS if tasks is None else tasks
+    validate_registry(entries)
+    return [
+        {
+            "task_id": task_id,
+            "description": entries[task_id]["description"],
+            "test_count": entries[task_id]["test_count"],
+        }
+        for task_id in sorted(entries)
+    ]
+
+
+validate_registry()

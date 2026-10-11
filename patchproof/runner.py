@@ -1,5 +1,5 @@
 
-"""PatchProof: evaluate a candidate patch against contract tests."""
+"""PatchProof: evaluate a candidate implementation against contract tests."""
 
 import argparse
 import json
@@ -11,9 +11,12 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+TASK_ID = "PP-001"
+
 TEST_SOURCE = r'''
 import pytest
 from candidate import final_price
+
 
 @pytest.mark.parametrize(
     ("price", "discount", "expected"),
@@ -26,6 +29,7 @@ from candidate import final_price
 )
 def test_valid_inputs(price, discount, expected):
     assert final_price(price, discount) == expected
+
 
 @pytest.mark.parametrize(
     ("price", "discount"),
@@ -43,6 +47,7 @@ def test_invalid_inputs_raise_value_error(price, discount):
 
 
 def evaluate(candidate_path: Path) -> dict:
+    """Run contract tests against a candidate Python file."""
     candidate_path = candidate_path.resolve()
 
     if not candidate_path.is_file():
@@ -57,53 +62,74 @@ def evaluate(candidate_path: Path) -> dict:
             TEST_SOURCE, encoding="utf-8"
         )
 
-        completed = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "-q",
-                "test_candidate.py",
-            ],
-            cwd=sandbox,
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pytest",
+                    "-q",
+                    "test_candidate.py",
+                ],
+                cwd=sandbox,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "task_id": TASK_ID,
+                "candidate": str(candidate_path),
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "passed": 0,
+                "failed": 0,
+                "errors": 0,
+                "exit_code": None,
+                "success": False,
+                "status": "timeout",
+                "output": str(exc),
+            }
 
         output = completed.stdout + "\n" + completed.stderr
-        summary = re.search(
-            r"(\d+) passed"
-            r"(?:, (\d+) failed)?"
-            r"(?:, (\d+) error)?",
-            output,
-        )
 
-        passed = int(summary.group(1)) if summary else 0
-        failed = int(summary.group(2) or 0) if summary else 0
-        errors = int(summary.group(3) or 0) if summary else 0
+        # Parse counts independently because pytest can print
+        # "3 failed, 5 passed" or "8 passed".
+        passed_match = re.search(r"(\d+) passed", output)
+        failed_match = re.search(r"(\d+) failed", output)
+        error_match = re.search(r"(\d+) errors?", output)
+
+        passed = int(passed_match.group(1)) if passed_match else 0
+        failed = int(failed_match.group(1)) if failed_match else 0
+        errors = int(error_match.group(1)) if error_match else 0
+
+        # A nonzero exit without a parsed test summary is a harness error,
+        # not a successful evaluation.
+        summary_found = bool(passed_match or failed_match or error_match)
+        if not summary_found and completed.returncode != 0:
+            status = "harness_error"
+        elif completed.returncode == 0 and failed == 0 and errors == 0:
+            status = "passed"
+        else:
+            status = "failed"
 
         return {
-            "task_id": "PP-001",
+            "task_id": TASK_ID,
             "candidate": str(candidate_path),
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
             "passed": passed,
             "failed": failed,
             "errors": errors,
             "exit_code": completed.returncode,
-            "success": (
-                completed.returncode == 0
-                and failed == 0
-                and errors == 0
-            ),
+            "success": status == "passed",
+            "status": status,
             "output": output.strip(),
         }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Evaluate a candidate implementation."
+        description="Evaluate a candidate implementation with PatchProof."
     )
     parser.add_argument(
         "--candidate",
@@ -119,7 +145,7 @@ def main() -> int:
 
     try:
         result = evaluate(Path(args.candidate))
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except (OSError, ValueError) as exc:
         print(f"Evaluation error: {exc}", file=sys.stderr)
         return 2
 
@@ -137,6 +163,7 @@ def main() -> int:
     print(f"Passed: {result['passed']}")
     print(f"Failed: {result['failed']}")
     print(f"Errors: {result['errors']}")
+    print(f"Status: {result['status']}")
     print(f"Success: {result['success']}")
     print(f"Report: {output_path}")
     print("\nTest output:\n" + result["output"])

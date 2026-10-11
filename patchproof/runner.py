@@ -1,5 +1,5 @@
 
-"""PatchProof: evaluate a candidate implementation against contract tests."""
+"""PatchProof: evaluate candidate implementations against contract tests."""
 
 import argparse
 import json
@@ -11,12 +11,12 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-TASK_ID = "PP-001"
-
-TEST_SOURCE = r'''
+TASKS = {
+    "PP-001": {
+        "test_count": 8,
+        "test_source": r'''
 import pytest
 from candidate import final_price
-
 
 @pytest.mark.parametrize(
     ("price", "discount", "expected"),
@@ -30,7 +30,6 @@ from candidate import final_price
 def test_valid_inputs(price, discount, expected):
     assert final_price(price, discount) == expected
 
-
 @pytest.mark.parametrize(
     ("price", "discount"),
     [
@@ -43,34 +42,68 @@ def test_valid_inputs(price, discount, expected):
 def test_invalid_inputs_raise_value_error(price, discount):
     with pytest.raises(ValueError):
         final_price(price, discount)
-'''
+''',
+    },
+    "PP-002": {
+        "test_count": 12,
+        "test_source": r'''
+import pytest
+from candidate import final_price
+
+@pytest.mark.parametrize(
+    ("price", "discount", "expected"),
+    [
+        (100, 10, 90.0),
+        (19.99, 0, 19.99),
+        (10, 100, 0.0),
+        (12.50, 20, 10.0),
+        (1.234, 0, 1.23),
+        (1.236, 0, 1.24),
+        (2.675, 0, 2.67),
+        (2.685, 0, 2.69),
+        (1.234, 20, 0.99),
+    ],
+)
+def test_final_price_rounding(price, discount, expected):
+    assert final_price(price, discount) == expected
+
+@pytest.mark.parametrize(
+    ("price", "discount"),
+    [
+        (-0.01, 10),
+        (100, -1),
+        (100, 100.01),
+    ],
+)
+def test_invalid_inputs(price, discount):
+    with pytest.raises(ValueError):
+        final_price(price, discount)
+''',
+    },
+}
 
 
-def evaluate(candidate_path: Path) -> dict:
-    """Run contract tests against a candidate Python file."""
+def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
+    """Run a task's contract tests against a candidate Python file."""
+    if task_id not in TASKS:
+        raise ValueError(f"Unknown task {task_id!r}. Choose from: {', '.join(TASKS)}")
+
     candidate_path = candidate_path.resolve()
-
     if not candidate_path.is_file():
-        raise FileNotFoundError(
-            f"Candidate file not found: {candidate_path}"
-        )
+        raise FileNotFoundError(f"Candidate file not found: {candidate_path}")
+
+    timestamp = datetime.now(timezone.utc).isoformat()
 
     with tempfile.TemporaryDirectory(prefix="patchproof_") as temp:
         sandbox = Path(temp)
         shutil.copy2(candidate_path, sandbox / "candidate.py")
         (sandbox / "test_candidate.py").write_text(
-            TEST_SOURCE, encoding="utf-8"
+            TASKS[task_id]["test_source"], encoding="utf-8"
         )
 
         try:
             completed = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "pytest",
-                    "-q",
-                    "test_candidate.py",
-                ],
+                [sys.executable, "-m", "pytest", "-q", "test_candidate.py"],
                 cwd=sandbox,
                 capture_output=True,
                 text=True,
@@ -79,9 +112,9 @@ def evaluate(candidate_path: Path) -> dict:
             )
         except subprocess.TimeoutExpired as exc:
             return {
-                "task_id": TASK_ID,
+                "task_id": task_id,
                 "candidate": str(candidate_path),
-                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "timestamp_utc": timestamp,
                 "passed": 0,
                 "failed": 0,
                 "errors": 0,
@@ -92,9 +125,6 @@ def evaluate(candidate_path: Path) -> dict:
             }
 
         output = completed.stdout + "\n" + completed.stderr
-
-        # Parse counts independently because pytest can print
-        # "3 failed, 5 passed" or "8 passed".
         passed_match = re.search(r"(\d+) passed", output)
         failed_match = re.search(r"(\d+) failed", output)
         error_match = re.search(r"(\d+) errors?", output)
@@ -103,8 +133,6 @@ def evaluate(candidate_path: Path) -> dict:
         failed = int(failed_match.group(1)) if failed_match else 0
         errors = int(error_match.group(1)) if error_match else 0
 
-        # A nonzero exit without a parsed test summary is a harness error,
-        # not a successful evaluation.
         summary_found = bool(passed_match or failed_match or error_match)
         if not summary_found and completed.returncode != 0:
             status = "harness_error"
@@ -114,9 +142,9 @@ def evaluate(candidate_path: Path) -> dict:
             status = "failed"
 
         return {
-            "task_id": TASK_ID,
+            "task_id": task_id,
             "candidate": str(candidate_path),
-            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "timestamp_utc": timestamp,
             "passed": passed,
             "failed": failed,
             "errors": errors,
@@ -137,6 +165,12 @@ def main() -> int:
         help="Path to a Python file implementing final_price.",
     )
     parser.add_argument(
+        "--task",
+        choices=sorted(TASKS),
+        default="PP-001",
+        help="Contract task to evaluate (default: PP-001).",
+    )
+    parser.add_argument(
         "--output",
         default="results/latest.json",
         help="Path for the JSON result report.",
@@ -144,7 +178,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        result = evaluate(Path(args.candidate))
+        result = evaluate(Path(args.candidate), args.task)
     except (OSError, ValueError) as exc:
         print(f"Evaluation error: {exc}", file=sys.stderr)
         return 2

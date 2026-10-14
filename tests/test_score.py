@@ -1,7 +1,14 @@
 
+import json
+
 import pytest
 
-from patchproof.score import TestResult as ScoreResult, summarize
+from patchproof.score import (
+    TestResult as ScoreResult,
+    load_evaluation_reports,
+    summarize,
+    write_summary,
+)
 
 
 def test_pass_rate():
@@ -70,3 +77,79 @@ def test_summarize_empty_results():
 def test_summarize_rejects_non_test_result():
     with pytest.raises(TypeError):
         summarize([{"task_id": "PP-001"}])
+
+
+def test_load_evaluation_report(tmp_path):
+    report_path = tmp_path / "latest.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "task_id": "PP-001",
+                "candidate": "candidate.py",
+                "passed": 8,
+                "failed": 0,
+                "errors": 0,
+                "exit_code": 0,
+                "status": "passed",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    results = load_evaluation_reports([report_path])
+
+    assert len(results) == 1
+    assert results[0].task_id == "PP-001"
+    assert results[0].model == "candidate"
+    assert results[0].passed == 8
+    assert results[0].total == 8
+    assert results[0].notes == "passed"
+
+
+def test_load_report_with_model_override(tmp_path):
+    report_path = tmp_path / "latest.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "task_id": "PP-002",
+                "passed": 11,
+                "exit_code": 1,
+                "status": "failed",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    results = load_evaluation_reports([report_path], "my-model")
+
+    assert results[0].model == "my-model"
+    assert results[0].total == 12
+
+
+def test_load_report_rejects_unknown_task(tmp_path):
+    report_path = tmp_path / "bad.json"
+    report_path.write_text(
+        json.dumps({"task_id": "PP-999", "passed": 0}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Unknown or missing task_id"):
+        load_evaluation_reports([report_path])
+
+
+def test_load_report_rejects_invalid_json(tmp_path):
+    report_path = tmp_path / "bad.json"
+    report_path.write_text("{not valid JSON", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Invalid JSON"):
+        load_evaluation_reports([report_path])
+
+
+def test_write_summary_creates_directory(tmp_path):
+    output_path = tmp_path / "reports" / "summary.json"
+    summary = {"attempts": 0, "results": []}
+
+    saved_path = write_summary(summary, output_path)
+
+    assert saved_path == output_path
+    assert json.loads(output_path.read_text(encoding="utf-8")) == summary

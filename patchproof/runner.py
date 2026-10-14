@@ -12,8 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from .history import append_result
     from .registry import TASKS, list_tasks
 except ImportError:
+    from history import append_result
     from registry import TASKS, list_tasks
 
 
@@ -39,8 +41,7 @@ def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
         sandbox = Path(temp)
         shutil.copy2(candidate_path, sandbox / "candidate.py")
         (sandbox / "test_candidate.py").write_text(
-            task["test_source"],
-            encoding="utf-8",
+            task["test_source"], encoding="utf-8"
         )
 
         try:
@@ -73,7 +74,6 @@ def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
             }
 
         output = completed.stdout + "\n" + completed.stderr
-
         passed_match = re.search(r"\b(\d+)\s+passed\b", output)
         failed_match = re.search(r"\b(\d+)\s+failed\b", output)
         error_match = re.search(r"\b(\d+)\s+errors?\b", output)
@@ -81,7 +81,6 @@ def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
         passed = int(passed_match.group(1)) if passed_match else 0
         failed = int(failed_match.group(1)) if failed_match else 0
         errors = int(error_match.group(1)) if error_match else 0
-
         summary_found = bool(
             passed_match or failed_match or error_match
         )
@@ -93,8 +92,6 @@ def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
                 if completed.returncode != 0
                 else "invalid_result"
             )
-        elif completed.returncode != 0 and reported_count == 0:
-            status = "harness_error"
         elif (
             completed.returncode == 0
             and passed == expected_count
@@ -122,19 +119,14 @@ def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description=(
-            "Evaluate a candidate implementation with PatchProof."
-        )
+        description="Evaluate a candidate implementation with PatchProof."
     )
-    parser.add_argument(
-        "--candidate",
-        help="Path to a Python file implementing final_price.",
-    )
+    parser.add_argument("--candidate", help="Candidate Python file.")
     parser.add_argument(
         "--task",
         choices=sorted(TASKS),
         default="PP-001",
-        help="Contract task to evaluate (default: PP-001).",
+        help="Contract task to evaluate.",
     )
     parser.add_argument(
         "--list-tasks",
@@ -144,7 +136,12 @@ def main() -> int:
     parser.add_argument(
         "--output",
         default="results/latest.json",
-        help="Path for the JSON result report.",
+        help="Path for the latest JSON report.",
+    )
+    parser.add_argument(
+        "--history",
+        default="results/history.jsonl",
+        help="Path for persistent JSON Lines evaluation history.",
     )
     args = parser.parse_args()
 
@@ -152,15 +149,12 @@ def main() -> int:
         for task in list_tasks():
             print(
                 f"{task['task_id']}\t"
-                f"{task['description']} "
-                f"({task['test_count']} tests)"
+                f"{task['description']} ({task['test_count']} tests)"
             )
         return 0
 
     if not args.candidate:
-        parser.error(
-            "--candidate is required unless --list-tasks is used"
-        )
+        parser.error("--candidate is required unless --list-tasks is used")
 
     try:
         result = evaluate(Path(args.candidate), args.task)
@@ -168,20 +162,23 @@ def main() -> int:
         print(f"Evaluation error: {exc}", file=sys.stderr)
         return 2
 
+    project_root = Path(__file__).resolve().parent.parent
     output_path = Path(args.output)
+    history_path = Path(args.history)
+
     if not output_path.is_absolute():
-        output_path = (
-            Path(__file__).resolve().parent.parent / output_path
-        )
+        output_path = project_root / output_path
+    if not history_path.is_absolute():
+        history_path = project_root / history_path
 
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(
-            json.dumps(result, indent=2),
-            encoding="utf-8",
+            json.dumps(result, indent=2), encoding="utf-8"
         )
-    except OSError as exc:
-        print(f"Could not write evaluation report: {exc}", file=sys.stderr)
+        append_result(result, history_path)
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"Could not save evaluation results: {exc}", file=sys.stderr)
         return 2
 
     print(f"Task: {result['task_id']}")
@@ -191,6 +188,7 @@ def main() -> int:
     print(f"Status: {result['status']}")
     print(f"Success: {result['success']}")
     print(f"Report: {output_path}")
+    print(f"History: {history_path}")
     print("\nTest output:\n" + result["output"])
 
     return 0 if result["success"] else 1

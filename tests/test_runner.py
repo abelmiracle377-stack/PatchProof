@@ -17,7 +17,7 @@ def test_buggy_candidate_is_rejected():
 
     result = evaluate(candidate)
 
-    assert result["passed"] == 5
+    assert result["passed"] == 6
     assert result["failed"] == 3
     assert result["success"] is False
     assert result["status"] == "failed"
@@ -33,7 +33,7 @@ def test_reference_candidate_is_accepted():
 
     result = evaluate(candidate)
 
-    assert result["passed"] == 8
+    assert result["passed"] == 9
     assert result["failed"] == 0
     assert result["success"] is True
     assert result["status"] == "passed"
@@ -109,4 +109,4 @@ def test_cli_appends_history_on_repeated_evaluations(
 
     assert len(records) == 2
     assert all(record["task_id"] == "PP-001" for record in records)
-    assert all(record["passed"] == 8 for record in records)
+    assert all(record["passed"] == 9 for record in records)

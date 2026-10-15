@@ -1,4 +1,4 @@
-
+﻿
 import json
 
 import pytest
@@ -102,7 +102,7 @@ def test_load_evaluation_report(tmp_path):
     assert results[0].task_id == "PP-001"
     assert results[0].model == "candidate"
     assert results[0].passed == 8
-    assert results[0].total == 8
+    assert results[0].total == 9
     assert results[0].notes == "passed"
 
 

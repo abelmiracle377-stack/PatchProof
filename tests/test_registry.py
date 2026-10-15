@@ -1,3 +1,4 @@
+
 import pytest
 
 from patchproof.registry import TASKS, list_tasks, validate_registry
@@ -9,7 +10,7 @@ def test_list_tasks_returns_sorted_metadata():
 
     assert [task["task_id"] for task in tasks] == ["PP-001", "PP-002"]
     assert tasks[0]["description"] == "Validate percentage discounts"
-    assert tasks[0]["test_count"] == 8
+    assert tasks[0]["test_count"] == 9
     assert tasks[1]["test_count"] == 12
 
 
@@ -50,7 +51,7 @@ def test_list_tasks_cli(capsys, monkeypatch):
     output = capsys.readouterr().out
     assert "PP-001" in output
     assert "PP-002" in output
-    assert "8 tests" in output
+    assert "9 tests" in output
     assert "12 tests" in output
 
 

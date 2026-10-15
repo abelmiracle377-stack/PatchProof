@@ -4,7 +4,7 @@
 TASKS = {
     "PP-001": {
         "description": "Validate percentage discounts",
-        "test_count": 8,
+        "test_count": 9,
         "test_source": r'''
 import pytest
 from candidate import final_price
@@ -35,6 +35,10 @@ def test_valid_inputs(price, discount, expected):
 def test_invalid_inputs_raise_value_error(price, discount):
     with pytest.raises(ValueError):
         final_price(price, discount)
+
+
+def test_discount_is_applied_before_rounding():
+    assert final_price(1.234, 20) == 0.99
 ''',
     },
     "PP-002": {

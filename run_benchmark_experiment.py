@@ -1,4 +1,5 @@
 
+
 """Run controlled candidate experiments against PatchProof tasks."""
 
 import json
@@ -23,6 +24,12 @@ def final_price(price: float, discount_percent: float) -> float:
 def final_price(price: float, discount_percent: float) -> float:
     if price < 0:
         raise ValueError("price must be non-negative")
+    return round(price * (1 - discount_percent / 100), 2)
+""",
+    "missing_price_validation": """
+def final_price(price: float, discount_percent: float) -> float:
+    if not 0 <= discount_percent <= 100:
+        raise ValueError("discount must be between 0 and 100")
     return round(price * (1 - discount_percent / 100), 2)
 """,
     "wrong_rounding_precision": """
@@ -78,7 +85,7 @@ def main():
     )
 
     print("Controlled benchmark experiment")
-    print("-" * 72)
+    print("-" * 78)
 
     for row in rows:
         print(

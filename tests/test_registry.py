@@ -8,10 +8,17 @@ from patchproof.runner import main
 def test_list_tasks_returns_sorted_metadata():
     tasks = list_tasks()
 
-    assert [task["task_id"] for task in tasks] == ["PP-001", "PP-002"]
+    assert [task["task_id"] for task in tasks] == [
+        "PP-001",
+        "PP-002",
+        "PP-003",
+    ]
     assert tasks[0]["description"] == "Validate percentage discounts"
     assert tasks[0]["test_count"] == 9
+    assert tasks[1]["description"] == "Rounding contract"
     assert tasks[1]["test_count"] == 12
+    assert tasks[2]["description"] == "Filter prices by maximum"
+    assert tasks[2]["test_count"] == 8
 
 
 def test_validate_registry_rejects_empty_registry():
@@ -49,10 +56,13 @@ def test_list_tasks_cli(capsys, monkeypatch):
 
     assert main() == 0
     output = capsys.readouterr().out
+
     assert "PP-001" in output
     assert "PP-002" in output
+    assert "PP-003" in output
     assert "9 tests" in output
     assert "12 tests" in output
+    assert "8 tests" in output
 
 
 def test_registry_has_expected_tasks():

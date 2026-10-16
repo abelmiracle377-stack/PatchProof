@@ -74,6 +74,7 @@ def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
             }
 
         output = completed.stdout + "\n" + completed.stderr
+
         passed_match = re.search(r"\b(\d+)\s+passed\b", output)
         failed_match = re.search(r"\b(\d+)\s+failed\b", output)
         error_match = re.search(r"\b(\d+)\s+errors?\b", output)
@@ -81,6 +82,7 @@ def evaluate(candidate_path: Path, task_id: str = "PP-001") -> dict:
         passed = int(passed_match.group(1)) if passed_match else 0
         failed = int(failed_match.group(1)) if failed_match else 0
         errors = int(error_match.group(1)) if error_match else 0
+
         summary_found = bool(
             passed_match or failed_match or error_match
         )

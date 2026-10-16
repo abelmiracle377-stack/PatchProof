@@ -9,7 +9,6 @@ TASKS = {
 import pytest
 from candidate import final_price
 
-
 @pytest.mark.parametrize(
     ("price", "discount", "expected"),
     [
@@ -21,7 +20,6 @@ from candidate import final_price
 )
 def test_valid_inputs(price, discount, expected):
     assert final_price(price, discount) == expected
-
 
 @pytest.mark.parametrize(
     ("price", "discount"),
@@ -36,7 +34,6 @@ def test_invalid_inputs_raise_value_error(price, discount):
     with pytest.raises(ValueError):
         final_price(price, discount)
 
-
 def test_discount_is_applied_before_rounding():
     assert final_price(1.234, 20) == 0.99
 ''',
@@ -47,7 +44,6 @@ def test_discount_is_applied_before_rounding():
         "test_source": r'''
 import pytest
 from candidate import final_price
-
 
 @pytest.mark.parametrize(
     ("price", "discount", "expected"),
@@ -66,7 +62,6 @@ from candidate import final_price
 def test_final_price_rounding(price, discount, expected):
     assert final_price(price, discount) == expected
 
-
 @pytest.mark.parametrize(
     ("price", "discount"),
     [
@@ -78,6 +73,42 @@ def test_final_price_rounding(price, discount, expected):
 def test_invalid_inputs(price, discount):
     with pytest.raises(ValueError):
         final_price(price, discount)
+''',
+    },
+    "PP-003": {
+        "description": "Filter prices by maximum",
+        "function": "filter_prices",
+        "test_count": 8,
+        "test_source": r'''
+import pytest
+from candidate import filter_prices
+
+def test_keeps_prices_at_or_below_limit():
+    assert filter_prices([5, 10, 15, 20], 10) == [5, 10]
+
+def test_preserves_original_order():
+    assert filter_prices([9, 3, 8, 1], 8) == [3, 8, 1]
+
+def test_keeps_duplicate_prices():
+    assert filter_prices([5, 5, 7, 5], 5) == [5, 5, 5]
+
+def test_empty_input():
+    assert filter_prices([], 10) == []
+
+def test_no_matches():
+    assert filter_prices([11, 12, 13], 10) == []
+
+def test_all_matches():
+    assert filter_prices([1, 2, 3], 3) == [1, 2, 3]
+
+def test_zero_limit():
+    assert filter_prices([0, 1, 0], 0) == [0, 0]
+
+def test_does_not_mutate_input():
+    prices = [7, 2, 9]
+    original = prices.copy()
+    filter_prices(prices, 7)
+    assert prices == original
 ''',
     },
 }
@@ -117,6 +148,12 @@ def validate_registry(tasks: dict | None = None) -> None:
         if not isinstance(test_source, str) or not test_source.strip():
             raise ValueError(
                 f"Task {task_id!r} requires non-empty test_source."
+            )
+
+        function_name = task.get("function", "final_price")
+        if not isinstance(function_name, str) or not function_name.isidentifier():
+            raise ValueError(
+                f"Task {task_id!r} requires a valid function name."
             )
 
 

@@ -1,5 +1,4 @@
 
-
 """Run controlled candidate experiments against PatchProof tasks."""
 
 import json
@@ -19,18 +18,27 @@ def final_price(price: float, discount_percent: float) -> float:
     if not 0 <= discount_percent <= 100:
         raise ValueError("discount must be between 0 and 100")
     return round(price * (1 - discount_percent / 100), 2)
+
+def filter_prices(prices, max_price):
+    return [price for price in prices if price <= max_price]
 """,
     "missing_discount_validation": """
 def final_price(price: float, discount_percent: float) -> float:
     if price < 0:
         raise ValueError("price must be non-negative")
     return round(price * (1 - discount_percent / 100), 2)
+
+def filter_prices(prices, max_price):
+    return [price for price in prices if price <= max_price]
 """,
     "missing_price_validation": """
 def final_price(price: float, discount_percent: float) -> float:
     if not 0 <= discount_percent <= 100:
         raise ValueError("discount must be between 0 and 100")
     return round(price * (1 - discount_percent / 100), 2)
+
+def filter_prices(prices, max_price):
+    return [price for price in prices if price <= max_price]
 """,
     "wrong_rounding_precision": """
 def final_price(price: float, discount_percent: float) -> float:
@@ -39,6 +47,9 @@ def final_price(price: float, discount_percent: float) -> float:
     if not 0 <= discount_percent <= 100:
         raise ValueError("discount must be between 0 and 100")
     return round(price * (1 - discount_percent / 100), 1)
+
+def filter_prices(prices, max_price):
+    return [price for price in prices if price <= max_price]
 """,
     "rounds_before_discount": """
 def final_price(price: float, discount_percent: float) -> float:
@@ -48,8 +59,13 @@ def final_price(price: float, discount_percent: float) -> float:
         raise ValueError("discount must be between 0 and 100")
     rounded_price = round(price, 2)
     return round(rounded_price * (1 - discount_percent / 100), 2)
+
+def filter_prices(prices, max_price):
+    return [price for price in prices if price <= max_price]
 """,
 }
+
+TASK_IDS = ("PP-001", "PP-002", "PP-003")
 
 
 def main():
@@ -65,7 +81,7 @@ def main():
                 encoding="utf-8",
             )
 
-            for task_id in ("PP-001", "PP-002"):
+            for task_id in TASK_IDS:
                 result = evaluate(candidate_path, task_id)
                 rows.append({
                     "candidate": candidate_name,
@@ -97,6 +113,7 @@ def main():
         )
 
     print(f"\nCandidates tested: {len(CANDIDATES)}")
+    print(f"Tasks tested: {len(TASK_IDS)}")
     print(f"Evaluations completed: {len(rows)}")
     print(f"Experiment report: {output_path}")
 

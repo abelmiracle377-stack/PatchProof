@@ -63,6 +63,17 @@ def final_price(price: float, discount_percent: float) -> float:
 def filter_prices(prices, max_price):
     return [price for price in prices if price <= max_price]
 """,
+    "excludes_prices_at_limit": """
+def final_price(price: float, discount_percent: float) -> float:
+    if price < 0:
+        raise ValueError("price must be non-negative")
+    if not 0 <= discount_percent <= 100:
+        raise ValueError("discount must be between 0 and 100")
+    return round(price * (1 - discount_percent / 100), 2)
+
+def filter_prices(prices, max_price):
+    return [price for price in prices if price < max_price]
+""",
 }
 
 TASK_IDS = ("PP-001", "PP-002", "PP-003")

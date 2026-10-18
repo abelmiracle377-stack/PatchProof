@@ -1,0 +1,12 @@
+Implement the function `final_price(price, discount_percent)`.
+
+Contract:
+- Reject negative prices by raising `ValueError`.
+- Reject discount percentages below 0 or above 100 by raising `ValueError`.
+- Accept discount percentages of exactly 0 and 100.
+- Calculate the discounted price using `price * (1 - discount_percent / 100)`.
+- Round the final result to two decimal places using Python's `round()` behavior.
+- Do not round the price before applying the discount.
+- Preserve the function name and signature.
+
+Return only the Python implementation. Do not modify or weaken any tests.

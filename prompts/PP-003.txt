@@ -1,0 +1,10 @@
+Implement the function `filter_prices(prices, max_price)`.
+
+Contract:
+- Return a list containing every price that is less than or equal to `max_price`.
+- Preserve the original order of matching prices.
+- Preserve duplicate matching prices.
+- Do not modify the input list.
+- Keep the function name and signature unchanged.
+
+Return only the Python implementation. Do not remove or weaken tests.
